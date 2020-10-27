@@ -26,6 +26,7 @@
 #include "esp_bt_device.h"
 #include "driver/gpio.h"
 #include "hid_dev.h"
+#include <hx711.h>
 
 /**
  * Brief:
@@ -194,6 +195,9 @@ void isr_button_pressed(void *args)
     }
 }
 
+#define PD_SCK_GPIO 18
+#define DOUT_GPIO 19
+
 void hid_demo_task(void *pvParameters)
 {
     //Configure button
@@ -216,8 +220,67 @@ void hid_demo_task(void *pvParameters)
     gpio_isr_handler_add(BUTTON_GPIO, isr_button_pressed, NULL); //Add handler of interrupt
     ESP_LOGI(HID_DEMO_TAG, "Interrupt configured");
 
+    //Configure pressure sensor
+    hx711_t dev = {
+        .dout = DOUT_GPIO,
+        .pd_sck = PD_SCK_GPIO,
+        .gain = HX711_GAIN_A_64};
+
+    //Initialize pressure sensor
     while (1)
     {
+        esp_err_t r = hx711_init(&dev);
+        if (r == ESP_OK)
+            break;
+        printf("Could not initialize HX711: %d (%s)\n", r, esp_err_to_name(r));
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+    int cock_sucking_duration = 0;
+    int32_t cock_sucking_pressure = -4000000;
+
+    while (1)
+    {
+        // Read pressure sensor
+        esp_err_t r = hx711_wait(&dev, 500);
+        if (r != ESP_OK)
+        {
+            printf("Device not found: %d (%s)\n", r, esp_err_to_name(r));
+            continue;
+        }
+
+        int32_t raw_pressure;
+        r = hx711_read_data(&dev, &raw_pressure);
+        if (r != ESP_OK)
+        {
+            printf("Could not read data: %d (%s)\n", r, esp_err_to_name(r));
+            continue;
+        }
+
+        // Cock sucking logic
+        if (raw_pressure < cock_sucking_pressure)
+        {
+            cock_sucking_duration++;
+            printf("Sucking cock for %f seconds\n", cock_sucking_duration / 2.0);
+        }
+        else if (cock_sucking_duration != 0)
+        {
+            // If started sucking and then stopped
+            cock_sucking_duration = 0;
+            gpio_set_level(LED_GPIO, 0);
+            printf("Stopped sucking cock\n");
+        }
+
+        if (cock_sucking_duration == 10)
+        {
+            // If sucking for 5 seconds, send bluetooth pause command
+            printf("Sucked cock enough to stop the alarm\n");
+            gpio_set_level(LED_GPIO, 1);
+            esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_PAUSE, true);
+            esp_hidd_send_consumer_value(hid_conn_id, HID_CONSUMER_PAUSE, false);
+        }
+
+        vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 

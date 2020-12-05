@@ -28,24 +28,7 @@
 #include "hid_dev.h"
 #include <hx711.h>
 
-/**
- * Brief:
- * This example Implemented BLE HID device profile related functions, in which the HID device
- * has 4 Reports (1 is mouse, 2 is keyboard and LED, 3 is Consumer Devices, 4 is Vendor devices).
- * Users can choose different reports according to their own application scenarios.
- * BLE HID profile inheritance and USB HID class.
- */
-
-/** 
- * Note:
- * 1. Win10 does not support vendor report , So SUPPORT_REPORT_VENDOR is always set to FALSE, it defines in hidd_le_prf_int.h
- * 2. Update connection parameters are not allowed during iPhone HID encryption, slave turns 
- * off the ability to automatically update connection parameters during encryption.
- * 3. After our HID device is connected, the iPhones write 1 to the Report Characteristic Configuration Descriptor, 
- * even if the HID encryption is not completed. This should actually be written 1 after the HID encryption is completed.
- * we modify the permissions of the Report Characteristic Configuration Descriptor to `ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE_ENCRYPTED`.
- * if you got `GATT_INSUF_ENCRYPTION` error, please ignore.
- */
+#include "audio_pipeline.h"
 
 #define HID_DEMO_TAG "SNOOZE_BUTTON"
 
@@ -251,6 +234,7 @@ void hid_demo_task(void *pvParameters)
 
         int32_t raw_pressure;
         r = hx711_read_data(&dev, &raw_pressure);
+        printf("Pressure: %d\n", raw_pressure);
         if (r != ESP_OK)
         {
             printf("Could not read data: %d (%s)\n", r, esp_err_to_name(r));
